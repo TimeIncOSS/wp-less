@@ -249,7 +249,7 @@ if ( !class_exists( 'wp_less' ) ) {
 				$less_cache_compiled = $less_cache['compiled'];
 
 				add_filter( 'check_less_compile', array( $this, 'check_less_compile' ), 10, 2 );
-				add_filter( 'check_write_log', array( $this, 'check_write_log' ), 10, 2 );
+				add_filter( 'write_less_log', array( $this, 'write_less_log' ), 10, 1 );
 
 				if ( apply_filters( 'check_less_compile', $cache, $less_cache_compiled ) ) {
 					// output css file name
@@ -288,8 +288,13 @@ if ( !class_exists( 'wp_less' ) ) {
 					}
 					$payload .= '<br>src: <code>"' . $src . '"</code> css path: <code>"' . $css_path . '"</code> and cache path: <code>"' . $cache_path . '"</code> and scheme <code>"' . $src_scheme . '"</code>';
 
-					apply_filters( 'write_log', true, $payload );
-
+					if( apply_filters( 'write_less_log' ) ){
+						$this->add_message( array(
+							'time'    => time(),
+							'payload' => $payload
+						) );
+					}
+					
 					$this->save_parsed_css( $css_path, $less_cache[ 'compiled' ] );
 					$this->update_cached_file_data( $handle, $cache );
 				}
@@ -335,13 +340,8 @@ if ( !class_exists( 'wp_less' ) ) {
 		 * @param $write
 		 * @return bool
 		 */
-		public function write_log( $write = true, $log_message = '' ){
-			if( $write ){
-				$this->add_message( array(
-					'time'    => time(),
-					'payload' => $log_message
-				) );
-			}
+		public function write_less_log( $write = true ){
+			return $write;
 		}
 		
 		/**
