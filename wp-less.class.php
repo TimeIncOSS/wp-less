@@ -239,6 +239,7 @@ if ( !class_exists( 'wp_less' ) ) {
 				} else {
 					$force = false;
 				}
+
 				$force = apply_filters( 'less_force_compile', $force );
 				$less_cache = $less->cachedCompile( $cache[ 'less' ], $force );
 
@@ -246,49 +247,13 @@ if ( !class_exists( 'wp_less' ) ) {
 				//sort( $cache['less'] );
 				//sort( $less_cache );
 
+				add_filter( 'save_less_css', array( $this, 'save_less_css' ), 1, 4 );
+
 				if ( empty( $cache ) || empty( $cache[ 'less' ][ 'updated' ] ) || md5( $less_cache['compiled'] ) !== md5( $cache['less']['compiled'] ) || $this->vars !== $cache['vars'] ) {
-					// output css file name
-					$css_path = trailingslashit( $this->get_cache_dir() ) . "{$handle}.css";
-
-					$cache = array(
-						'vars'    => $this->vars,
-						'url'     => trailingslashit( $this->get_cache_dir( false ) ) . "{$handle}.css",
-						'version' => $less_version,
-						'less'    => null
-					);
-					
-					/**
-					 * If the option to not have LESS always compiled is set,
-					 * then we dont store the whole less_cache in the options table as it's
-					 * not needed because we only do a comparison based off $vars and $src
-					 * (which includes the $ver param).
-					 *
-					 * This saves space on the options table for high performance environments.
-					 */
-					if ( get_option( 'wp_less_always_compile_less', true ) ) {
-						$cache['less'] = $less_cache;
-					}
-
-					$payload = '<strong>Rebuilt stylesheet with handle: "'.$handle.'"</strong><br>';
-					if ( $this->vars != $cache[ 'vars' ] ) {
-						$payload .= '<em>Variables changed</em>';
-						$difference = array_merge(array_diff_assoc( $cache['vars'], $this->vars), array_diff_assoc($this->vars, $cache['vars'] ));
-						$payload .= '<pre>'.print_r( $difference, true ).'</pre>';
-					} else if ( empty( $cache ) || empty( $cache[ 'less' ][ 'updated' ] ) ) {
-						$payload .= '<em>Empty cache or empty last update time</em>';
-					} else if ( $less_cache[ 'updated' ] > $cache[ 'less' ][ 'updated' ] ) {
-						$payload .= '<em>Update times different</em>';
-					} else {
-						$payload .= '<em><strong>Unknown! Contact the developers poste haste!!!!!!!</em><strong></em>';
-					}
-					$payload .= '<br>src: <code>"'.$src.'"</code> css path: <code>"'.$css_path.'"</code> and cache path: <code>"'.$cache_path.'"</code> and scheme <code>"'.$src_scheme.'"</code>';
-					$this->add_message( array(
-						'time' => time(),
-						'payload' => $payload
-					) );
-					$this->save_parsed_css( $css_path, $less_cache[ 'compiled' ] );
-					$this->update_cached_file_data( $handle, $cache );
+					apply_filters( 'save_less_css', $less_cache, $less_version, $handle, $src );
 				}
+
+
 			} catch ( exception $ex ) {
 				$this->add_message( array(
 					'time' => time(),
@@ -309,6 +274,52 @@ if ( !class_exists( 'wp_less' ) ) {
 			}
 
 			return add_query_arg( 'ver', $less_version, $url );
+
+		}
+
+		public function save_less_css( $less_cache, $less_version, $handle, $src ){
+
+			// output css file name
+			$css_path = trailingslashit( $this->get_cache_dir() ) . "{$handle}.css";
+			$cache = array(
+				'vars'    => $this->vars,
+				'url'     => trailingslashit( $this->get_cache_dir( false ) ) . "{$handle}.css",
+				'version' => $less_version,
+				'less'    => null
+			);
+
+			/**
+			 * If the option to not have LESS always compiled is set,
+			 * then we dont store the whole less_cache in the options table as it's
+			 * not needed because we only do a comparison based off $vars and $src
+			 * (which includes the $ver param).
+			 *
+			 * This saves space on the options table for high performance environments.
+			 */
+			if ( get_option( 'wp_less_always_compile_less', true ) ) {
+				$cache['less'] = $less_cache;
+			}
+
+			$payload = '<strong>Rebuilt stylesheet with handle: "'.$handle.'"</strong><br>';
+			if ( $this->vars != $cache[ 'vars' ] ) {
+				$payload .= '<em>Variables changed</em>';
+				$difference = array_merge(array_diff_assoc( $cache['vars'], $this->vars), array_diff_assoc($this->vars, $cache['vars'] ));
+				$payload .= '<pre>'.print_r( $difference, true ).'</pre>';
+			} else if ( empty( $cache ) || empty( $cache[ 'less' ][ 'updated' ] ) ) {
+				$payload .= '<em>Empty cache or empty last update time</em>';
+			} else if ( $less_cache[ 'updated' ] > $cache[ 'less' ][ 'updated' ] ) {
+				$payload .= '<em>Update times different</em>';
+			} else {
+				$payload .= '<em><strong>Unknown! Contact the developers poste haste!!!!!!!</em><strong></em>';
+			}
+			$payload .= '<br>src: <code>"'.$src.'"</code> css path: <code>"'.$css_path.'"</code> and cache path: <code>"'.$cache_path.'"</code> and scheme <code>"'.$src_scheme.'"</code>';
+			$this->add_message( array(
+				'time' => time(),
+				'payload' => $payload
+			) );
+			$this->save_parsed_css( $css_path, $less_cache[ 'compiled' ] );
+			$this->update_cached_file_data( $handle, $cache );
+
 
 		}
 		
