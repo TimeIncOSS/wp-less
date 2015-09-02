@@ -239,7 +239,7 @@ if ( !class_exists( 'wp_less' ) ) {
 				} else {
 					$force = false;
 				}
-
+				$force = true;
 				$force = apply_filters( 'less_force_compile', $force );
 				$less_cache = $less->cachedCompile( $cache[ 'less' ], $force );
 
@@ -247,7 +247,7 @@ if ( !class_exists( 'wp_less' ) ) {
 				//sort( $cache['less'] );
 				//sort( $less_cache );
 
-				if( $this->check_less_compile( $cache, $less_cache['compiled'] ) ){
+				if( empty( $cache ) || empty( $cache[ 'less' ][ 'updated' ] ) || md5( $less_cache['compiled'] ) !== md5( $cache['less']['compiled'] ) || $this->vars !== $cache['vars'] ){
 
 					// output css file name
 					$css_path = trailingslashit( $this->get_cache_dir() ) . "{$handle}.css";
@@ -285,12 +285,10 @@ if ( !class_exists( 'wp_less' ) ) {
 					}
 					$payload .= '<br>src: <code>"' . $src . '"</code> css path: <code>"' . $css_path . '"</code> and cache path: <code>"' . $cache_path . '"</code> and scheme <code>"' . $src_scheme . '"</code>';
 
-					if( $this->write_less_log() ){
-						$this->add_message( array(
-							'time'    => time(),
-							'payload' => $payload
-						) );
-					}
+					$this->add_message( array(
+						'time'    => time(),
+						'payload' => $payload
+					) );
 
 					$this->save_parsed_css( $css_path, $less_cache[ 'compiled' ] );
 					$this->update_cached_file_data( $handle, $cache );
@@ -319,32 +317,6 @@ if ( !class_exists( 'wp_less' ) ) {
 
 		}
 
-		/**
-		 * Check conditions to recompile css file
-		 *
-		 *
-		 * @param $cache
-		 * @param $less_cache_compiled
-		 * @return bool
-		 */
-		public function check_less_compile( $cache = array(), $less_cache_compiled = '' ){
-			$res = ( empty( $cache ) || empty( $cache[ 'less' ][ 'updated' ] ) || md5( $less_cache_compiled ) !== md5( $cache['less']['compiled'] ) || $this->vars !== $cache['vars'] );
-			return apply_filters( 'check_less_compile', $res );
-		}
-
-		/**
-		 * Check if should write log message
-		 *
-		 *
-		 * @param $write
-		 * @return bool
-		 */
-		public function write_less_log( $write = true ){
-			return apply_filters( 'write_less_log', $write );
-		}
-
-
-		
 		/**
 		* Update parsed cache data for this file
 		*
@@ -510,14 +482,21 @@ if ( !class_exists( 'wp_less' ) ) {
 		}
 
 		public function add_message( $message_string ) {
-			$messages = get_option('wpless-recent-messages');
-			if ( !is_array( $messages ) ) {
-				$messages = array();
-			}
 
-			$messages = array_slice( $messages, 0, 19 );
-			array_unshift( $messages, $message_string );
-			update_option( 'wpless-recent-messages', $messages );
+			$write_to_file = apply_filters( 'write_less_file_log', false );
+
+			if( $write_to_file ){
+				error_log( 'time: ' . $message_string['time'] . "\n" . $message_string['payload'], 3, "/tmp/php.log" );
+			}else {
+				$messages = get_option( 'wpless-recent-messages' );
+				if ( ! is_array( $messages ) ) {
+					$messages = array();
+				}
+
+				$messages = array_slice( $messages, 0, 19 );
+				array_unshift( $messages, $message_string );
+				update_option( 'wpless-recent-messages', $messages );
+			}
 		}
 	}
 }
