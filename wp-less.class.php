@@ -247,8 +247,54 @@ if ( !class_exists( 'wp_less' ) ) {
 				//sort( $cache['less'] );
 				//sort( $less_cache );
 
-				$this->recompile_less( $cache, $less_cache, $handle, $less_version, $src, $src_scheme );
+				if( $this->check_less_compile( $cache, $less_cache['compiled'] ) ){
 
+					// output css file name
+					$css_path = trailingslashit( $this->get_cache_dir() ) . "{$handle}.css";
+
+					$cache = array(
+						'vars'    => $this->vars,
+						'url'     => trailingslashit( $this->get_cache_dir( false ) ) . "{$handle}.css",
+						'version' => $less_version,
+						'less'    => null
+					);
+
+					/**
+					 * If the option to not have LESS always compiled is set,
+					 * then we dont store the whole less_cache in the options table as it's
+					 * not needed because we only do a comparison based off $vars and $src
+					 * (which includes the $ver param).
+					 *
+					 * This saves space on the options table for high performance environments.
+					 */
+					if ( get_option( 'wp_less_always_compile_less', true ) ) {
+						$cache['less'] = $less_cache;
+					}
+
+					$payload = '<strong>Rebuilt stylesheet with handle: "' . $handle . '"</strong><br>';
+					if ( $this->vars != $cache[ 'vars' ] ) {
+						$payload .= '<em>Variables changed</em>';
+						$difference = array_merge( array_diff_assoc( $cache[ 'vars' ], $this->vars ), array_diff_assoc( $this->vars, $cache[ 'vars' ] ) );
+						$payload .= '<pre>' . print_r( $difference, true ) . '</pre>';
+					} else if ( empty( $cache ) || empty( $cache[ 'less' ][ 'updated' ] ) ) {
+						$payload .= '<em>Empty cache or empty last update time</em>';
+					} else if ( $less_cache[ 'updated' ] > $cache[ 'less' ][ 'updated' ] ) {
+						$payload .= '<em>Update times different</em>';
+					} else {
+						$payload .= '<em><strong>Unknown! Contact the developers poste haste!!!!!!!</em><strong></em>';
+					}
+					$payload .= '<br>src: <code>"' . $src . '"</code> css path: <code>"' . $css_path . '"</code> and cache path: <code>"' . $cache_path . '"</code> and scheme <code>"' . $src_scheme . '"</code>';
+
+					if( $this->write_less_log() ){
+						$this->add_message( array(
+							'time'    => time(),
+							'payload' => $payload
+						) );
+					}
+
+					$this->save_parsed_css( $css_path, $less_cache[ 'compiled' ] );
+					$this->update_cached_file_data( $handle, $cache );
+				}
 
 			} catch ( exception $ex ) {
 				$this->add_message( array(
@@ -282,7 +328,8 @@ if ( !class_exists( 'wp_less' ) ) {
 		 * @return bool
 		 */
 		public function check_less_compile( $cache = array(), $less_cache_compiled = '' ){
-			return ( empty( $cache ) || empty( $cache[ 'less' ][ 'updated' ] ) || md5( $less_cache_compiled ) !== md5( $cache['less']['compiled'] ) || $this->vars !== $cache['vars'] );
+			$res = ( empty( $cache ) || empty( $cache[ 'less' ][ 'updated' ] ) || md5( $less_cache_compiled ) !== md5( $cache['less']['compiled'] ) || $this->vars !== $cache['vars'] );
+			return apply_filters( 'check_less_compile', $res );
 		}
 
 		/**
@@ -293,75 +340,10 @@ if ( !class_exists( 'wp_less' ) ) {
 		 * @return bool
 		 */
 		public function write_less_log( $write = true ){
-			return $write;
+			return apply_filters( 'write_less_log', $write );
 		}
 
-		/**
-		 * Check if should write log message
-		 *
-		 *
-		 * @param $cache
-		 * @param $less_cache
-		 * @param $handle
-		 * @param $less_version
-		 * @param $src
-		 * @param $src_scheme
-		 * @return void
-		 */
-		public function recompile_less( $cache, $less_cache, $handle, $less_version, $src, $src_scheme ){
 
-			add_filter( 'write_less_log', array( $this, 'write_less_log' ), 10, 1 );
-			add_filter( 'check_less_compile', array( $this, 'check_less_compile' ), 10, 2 );
-
-			echo "1 - ";
-
-			if ( apply_filters( 'check_less_compile', $cache, $less_cache['compiled'] ) ) {
-				echo "2 - ";
-				// output css file name
-				$css_path = trailingslashit( $this->get_cache_dir() ) . "{$handle}.css";
-
-				$cache = array(
-					'vars'    => $this->vars,
-					'url'     => trailingslashit( $this->get_cache_dir( false ) ) . "{$handle}.css",
-					'version' => $less_version,
-					'less'    => null
-				);
-
-				/**
-				 * If the option to not have LESS always compiled is set,
-				 * then we dont store the whole less_cache in the options table as it's
-				 * not needed because we only do a comparison based off $vars and $src
-				 * (which includes the $ver param).
-				 *
-				 * This saves space on the options table for high performance environments.
-				 */
-				if ( get_option( 'wp_less_always_compile_less', true ) ) {
-					$cache['less'] = $less_cache;
-				}
-
-				$payload = '<strong>Rebuilt stylesheet with handle: "' . $handle . '"</strong><br>';
-				if ( $this->vars != $cache[ 'vars' ] ) {
-					$payload .= '<em>Variables changed</em>';
-					$difference = array_merge( array_diff_assoc( $cache[ 'vars' ], $this->vars ), array_diff_assoc( $this->vars, $cache[ 'vars' ] ) );
-					$payload .= '<pre>' . print_r( $difference, true ) . '</pre>';
-				} else if ( empty( $cache ) || empty( $cache[ 'less' ][ 'updated' ] ) ) {
-					$payload .= '<em>Empty cache or empty last update time</em>';
-				} else if ( $less_cache[ 'updated' ] > $cache[ 'less' ][ 'updated' ] ) {
-					$payload .= '<em>Update times different</em>';
-				} else {
-					$payload .= '<em><strong>Unknown! Contact the developers poste haste!!!!!!!</em><strong></em>';
-				}
-				$payload .= '<br>src: <code>"' . $src . '"</code> css path: <code>"' . $css_path . '"</code> and cache path: <code>"' . $cache_path . '"</code> and scheme <code>"' . $src_scheme . '"</code>';
-
-				$this->add_message( array(
-					'time'    => time(),
-					'payload' => $payload
-				) );
-				echo "3     ___";
-				$this->save_parsed_css( $css_path, $less_cache[ 'compiled' ] );
-				$this->update_cached_file_data( $handle, $cache );
-			}
-		}
 		
 		/**
 		* Update parsed cache data for this file
@@ -528,17 +510,14 @@ if ( !class_exists( 'wp_less' ) ) {
 		}
 
 		public function add_message( $message_string ) {
-
-			if( apply_filters( 'write_less_log', false ) ){
-				$messages = get_option('wpless-recent-messages');
-				if ( !is_array( $messages ) ) {
-					$messages = array();
-				}
-
-				$messages = array_slice( $messages, 0, 19 );
-				array_unshift( $messages, $message_string );
-				update_option( 'wpless-recent-messages', $messages );
+			$messages = get_option('wpless-recent-messages');
+			if ( !is_array( $messages ) ) {
+				$messages = array();
 			}
+
+			$messages = array_slice( $messages, 0, 19 );
+			array_unshift( $messages, $message_string );
+			update_option( 'wpless-recent-messages', $messages );
 		}
 	}
 }
