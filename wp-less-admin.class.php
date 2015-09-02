@@ -28,7 +28,10 @@ class wp_less_admin {
 	}
 
 	public function add_pages() {
-		add_management_page( 'WP LESS', 'WP LESS', 'manage_options', 'wpless', array( $this, 'display' ) );
+		$write_to_file = apply_filters( 'write_less_file_log', false );
+		if( ! $write_to_file ) {
+			add_management_page( 'WP LESS', 'WP LESS', 'manage_options', 'wpless', array( $this, 'display' ) );
+		}
 	}
 
 	public function display() {

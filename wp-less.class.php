@@ -485,8 +485,8 @@ if ( !class_exists( 'wp_less' ) ) {
 			$write_to_file = apply_filters( 'write_less_file_log', false );
 
 			if( $write_to_file ){
-				error_log( 'time: ' . $message_string['time'] . "\n" . $message_string['payload'], 3, "/tmp/php.log" );
-			}else {
+				error_log( wp_strip_all_tags( $message_string['payload'] ) );
+			} else {
 				$messages = get_option( 'wpless-recent-messages' );
 				if ( ! is_array( $messages ) ) {
 					$messages = array();
