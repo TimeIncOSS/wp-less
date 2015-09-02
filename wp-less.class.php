@@ -239,7 +239,6 @@ if ( !class_exists( 'wp_less' ) ) {
 				} else {
 					$force = false;
 				}
-				$force = true;
 				$force = apply_filters( 'less_force_compile', $force );
 				$less_cache = $less->cachedCompile( $cache[ 'less' ], $force );
 
